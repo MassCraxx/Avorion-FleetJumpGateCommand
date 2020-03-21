@@ -1,12 +1,77 @@
 -- Fleet Jump through Gate Command Mod by MassCraxx
--- v3
+-- v4
 
-OrderButtonType["Wormhole"] = 12
+package.path = package.path .. ";data/scripts/?.lua"
+include("utility")
+include("stringutility")
+include ("callable")
+
+OrderButtonType["Gate"] = 12
+OrderButtonType["Wormhole"] = 13
+
+local gateWindow
+local gateCombo
+local gateData = {}
+
 if onClient() then
+
+-- Gate name util
+local dirs =
+{
+    {name = "E /*direction*/"%_t,    angle = math.pi * 2 * 0 / 16},
+    {name = "ENE /*direction*/"%_t,  angle = math.pi * 2 * 1 / 16},
+    {name = "NE /*direction*/"%_t,   angle = math.pi * 2 * 2 / 16},
+    {name = "NNE /*direction*/"%_t,  angle = math.pi * 2 * 3 / 16},
+    {name = "N /*direction*/"%_t,    angle = math.pi * 2 * 4 / 16},
+    {name = "NNW /*direction*/"%_t,  angle = math.pi * 2 * 5 / 16},
+    {name = "NW /*direction*/"%_t,   angle = math.pi * 2 * 6 / 16},
+    {name = "WNW /*direction*/"%_t,  angle = math.pi * 2 * 7 / 16},
+    {name = "W /*direction*/"%_t,    angle = math.pi * 2 * 8 / 16},
+    {name = "WSW /*direction*/"%_t,  angle = math.pi * 2 * 9 / 16},
+    {name = "SW /*direction*/"%_t,   angle = math.pi * 2 * 10 / 16},
+    {name = "SSW /*direction*/"%_t,  angle = math.pi * 2 * 11 / 16},
+    {name = "S /*direction*/"%_t,    angle = math.pi * 2 * 12 / 16},
+    {name = "SSE /*direction*/"%_t,  angle = math.pi * 2 * 13 / 16},
+    {name = "SE /*direction*/"%_t,   angle = math.pi * 2 * 14 / 16},
+    {name = "ESE /*direction*/"%_t,  angle = math.pi * 2 * 15 / 16},
+    {name = "E /*direction*/"%_t,    angle = math.pi * 2 * 16 / 16}
+}
+
+function getGateName(x, y, tx, ty)
+    local ownAngle = math.atan2(ty - y, tx - x) + math.pi * 2
+    if ownAngle > math.pi * 2 then ownAngle = ownAngle - math.pi * 2 end
+    if ownAngle < 0 then ownAngle = ownAngle + math.pi * 2 end
+
+    local dirString = ""
+    local min = 3.0 
+    for _, dir in pairs(dirs) do
+        local d = math.abs(ownAngle - dir.angle)
+        if d < min then
+            min = d
+            dirString = dir.name -- set our gate's direction string so it can be used to set an icon for it.
+        end
+    end
+    return dirString
+end
+
+-- Init
+
 local oldInitUI = MapCommands.initUI
 function MapCommands.initUI()
     oldInitUI()
-    local wormholeOrder = {tooltip = "Wormhole"%_t, icon = "data/textures/icons/wormhole.png", callback = "onWormholePressed", type = OrderButtonType.Wormhole}
+    -- gate button
+    local gateOrder = {tooltip = "Use Gate"%_t, icon = "data/textures/icons/patrol.png", callback = "onGatePressed", type = OrderButtonType.Gate}
+    local index = #orders-1
+    
+    table.insert(orders, index, gateOrder)
+
+    local gateButton = ordersContainer:createRoundButton(Rect(), gateOrder.icon, gateOrder.callback)
+    gateButton.tooltip = gateOrder.tooltip
+
+    table.insert(orderButtons, index, gateButton)
+
+    -- wormhole button
+    local wormholeOrder = {tooltip = "Use Wormhole"%_t, icon = "data/textures/icons/wormhole.png", callback = "onWormholePressed", type = OrderButtonType.Wormhole}
     local index = #orders-1
     
     table.insert(orders, index, wormholeOrder)
@@ -15,197 +80,110 @@ function MapCommands.initUI()
     button.tooltip = wormholeOrder.tooltip
 
     table.insert(orderButtons, index, button)
+
+    -- gate window
+    local res = getResolution()
+    local gateWindowSize = vec2(400, 50)
+    gateWindow = GalaxyMap():createWindow(Rect(res * 0.5 - gateWindowSize * 0.5, res * 0.5 + gateWindowSize * 0.5))
+    gateWindow.caption = "Jump through Gate"%_t
+
+    local vsplit = UIVerticalSplitter(Rect(gateWindow.size), 10, 10, 0.6)
+    gateCombo = gateWindow:createValueComboBox(vsplit.left, "")
+    gateButton = gateWindow:createButton(vsplit.right, "Jump"%_t, "onGateWindowOKButtonPressed")
+
+    gateWindow.showCloseButton = 1
+    gateWindow.moveable = 1
+    gateWindow:hide()
 end
 
-function MapCommands.updateButtonLocations()
-    if #craftPortraits == 0 then
-        MapCommands.hideOrderButtons()
-        return
-    end
-
-    MapCommands.enchainCoordinates = nil
-
-    local enqueueing = MapCommands.isEnqueueing()
-    local sx, sy = GalaxyMap():getSelectedCoordinatesScreenPosition()
-    local cx, cy = GalaxyMap():getSelectedCoordinates()
-    local selected = MapCommands.getSelectedPortraits()
-
-    local usedPortraits
-    if #selected > 0 and enqueueing then
-        usedPortraits = selected
-
-        local x, y = MapCommands.getLastLocationFromInfo(selected[1].info)
-        if x and y then
-            sx, sy = GalaxyMap():getCoordinatesScreenPosition(ivec2(x, y))
-            cx, cy = x, y
-            MapCommands.enchainCoordinates = {x=x, y=y}
-        else
-            MapCommands.enchainCoordinates = {x=cx, y=cy}
-        end
-    else
-        usedPortraits = craftPortraits
-    end
-
-
-    for _, portrait in pairs(craftPortraits) do
-        if enqueueing and not portrait.portrait.selected then
-            portrait.portrait:hide()
-            portrait.icon:hide()
-        end
-    end
-
-    local showAbove = Keyboard():keyPressed(KeyboardKey.LControl) or Keyboard():keyPressed(KeyboardKey.RControl)
-
-    -- portraits
-    local diameter = 50
-    local padding = 10
-
-    local columns = math.min(#usedPortraits, math.max(4, round(math.sqrt(#usedPortraits))))
-
-    local offset = vec2(columns * diameter + (columns - 1) * padding, padding * 3)
-    offset.x = -offset.x / 2
-    offset = offset + vec2(sx, sy)
-
-    local x = 0
-    local y = 0
-    for _, portrait in pairs(usedPortraits) do
-        local rect = Rect()
-        rect.lower = vec2(x * (diameter + padding), y * (diameter + padding)) + offset
-        rect.upper = rect.lower + vec2(diameter, diameter)
-        portrait.portrait.rect = rect
-        portrait.portrait:show()
-
-        if portrait.picture and portrait.picture ~= "" then
-            portrait.icon.rect = Rect(rect.topRight - vec2(8, 8), rect.topRight + vec2(8, 8))
-            portrait.icon:show()
-            portrait.icon.picture = portrait.picture
-        end
-
-        if showAbove then
-            MapCommands.mirrorUIElementY(portrait.portrait, sy)
-            MapCommands.mirrorUIElementY(portrait.icon, sy)
-        end
-
-        x = x + 1
-        if x >= columns then
-            x = 0
-            y = y + 1
-        end
-
-        ::continue::
-    end
-
-
-    -- buttons
-    if #selected > 0 then
-        if x ~= 0 then
-            y = y + 1
-        end
-
-        local visibleButtons = {}
-        for i, button in pairs(orderButtons) do
-            local add = true
-
-            if (orders[i].type == OrderButtonType.Stop or orders[i].type == OrderButtonType.Wormhole) and MapCommands.isEnqueueing() then
-                -- cannot enqueue a "stop"
-                add = false
-            elseif orders[i].type == OrderButtonType.Undo then
-
-                -- cannot undo if there is nothing to undo
-                local hasCommands = false
-
-                for _, portrait in pairs(selected) do
-                    if MapCommands.hasCommandToUndo(portrait.info) then
-                        hasCommands = true
-                        break
-                    end
-                end
-
-                if not hasCommands then
-                    add = false
-                end
-
-            elseif orders[i].type == OrderButtonType.Loop then
-                -- cannot loop if there are no commands based in the selected sector
-                local hasCommands = false
-
-                if MapCommands.isEnqueueing() then
-                    for _, portrait in pairs(selected) do
-                        local commands = MapCommands.getCommandsFromInfo(portrait.info, cx, cy)
-                        if #commands > 0 then
-                            hasCommands = true
-                            break
-                        end
-                    end
-                end
-
-                if not hasCommands then
-                    add = false
-                end
-            end
-
-            if add then
-                table.insert(visibleButtons, button)
-            else
-                button:hide()
-            end
-        end
-
-
-        local oDiameter = 35
-
-        local offset = vec2(#visibleButtons * oDiameter + (#visibleButtons - 1) * padding, padding * 5)
-        offset.x = -offset.x / 2
-        offset = offset + vec2(sx, sy)
-
-        for _, button in pairs(visibleButtons) do
-            local rect = Rect()
-            rect.lower = vec2(x * (oDiameter + padding), y * (oDiameter + padding)) + offset
-            rect.upper = rect.lower + vec2(oDiameter, oDiameter)
-            button.rect = rect
-
-            if showAbove then
-                MapCommands.mirrorUIElementY(button, sy)
-            end
-
-            button:show()
-
-            x = x + 1
-        end
-    else
-        MapCommands.hideOrderButtons()
-    end
-end
+-- Wormhole Button
 
 function MapCommands.onWormholePressed()
     MapCommands.clearOrdersIfNecessary()
-    MapCommands.enqueueOrder("addWormholeOrder")
+    MapCommands.enqueueOrder("addDiscoverWormholeOrder")
+    if not MapCommands.isEnqueueing() then MapCommands.runOrders() end
 end
 
-function MapCommands.getCommandsFromInfo(info, x, y)
-    if not info then return {} end
-    if not info.chain then return {} end
-    if not info.coordinates then return {} end
+-- Gate Window
 
-    local cx, cy = info.coordinates.x, info.coordinates.y
-    local i = info.currentIndex
+local oldhideOrderButtons = MapCommands.hideOrderButtons
+function MapCommands.hideOrderButtons()
+    oldhideOrderButtons()
+    gateWindow:hide()
+end
 
-    local result = {}
-    while i > 0 and i <= #info.chain do
-        local current = info.chain[i]
+function MapCommands.onGatePressed()
+    enqueueNextOrder = MapCommands.isEnqueueing()
 
-        if cx == x and cy == y then
-            table.insert(result, current)
+    gateCombo:clear()
+    gateData = {}
+
+    local x, y = GalaxyMap():getSelectedCoordinates()
+
+    if MapCommands.isEnqueueing() then
+        local selected = MapCommands.getSelectedPortraits()
+        if #selected > 0 then
+            local ix, iy = MapCommands.getLastLocationFromInfo(selected[1].info)
+            if ix and iy then
+                x, y = ix, iy
+            end
         end
-
-        if current.action == OrderType.Jump or current.action == OrderType.FlyThroughWormhole then
-            cx, cy = current.x, current.y
-        end
-
-        i = i + 1
     end
 
-    return result
+    local player = Player()
+    local sectorView = player:getKnownSector(x, y)
+    if sectorView == nil then
+        onError("Sector %i:%i has not been discovered yet."%_T, x, y)
+    else
+        local gateDestinations = {sectorView:getGateDestinations()}
+
+        if #gateDestinations == 0 then
+            onError(string.format("No Gate found in Sector %i:%i!"%_T, x, y))
+        else
+            for i, dest in pairs(gateDestinations) do
+                local dir = getGateName(x, y, dest.x, dest.y)
+                
+                for i = string.len(dir),2,1 do 
+                    dir = dir .. " " 
+                end
+
+                local line = string.format("%s | %i : %i"%_t, dir, dest.x, dest.y)
+    
+                color = ColorRGB(0.875, 0.875, 0.875)
+    
+                gateData[line] = dest
+                gateCombo:addEntry(dir, line, color)
+            end
+    
+            buyWindow:hide()
+            sellWindow:hide()
+            escortWindow:hide()
+            gateWindow:show()
+        end  
+    end
+end
+
+function MapCommands.onGateWindowOKButtonPressed()
+    local factionIndex = gateCombo.selectedValue
+    local craftLine = gateCombo.selectedEntry
+    local gate = gateData[craftLine]
+
+    MapCommands.clearOrdersIfNecessary(not enqueueNextOrder) -- clear if not enqueueing
+    MapCommands.enqueueOrder("addFlyThroughGateOrder", gate.x, gate.y)
+    if not enqueueNextOrder then MapCommands.runOrders() end
+
+    gateWindow:hide()
+end
+
+function onError(msg, ...)
+    -- FIXME if u can
+    msg = string.format(msg, ...)
+    print("Error: " .. msg)
+
+    local player = Player()
+    local x, y = player:getShipPosition(name)
+
+    invokeEntityFunction(x, y, msg, player.craft.id, "data/scripts/entity/orderchain.lua", "sendError", "If you see this message, my hack did not work.")
 end
 
 end -- onClient()
