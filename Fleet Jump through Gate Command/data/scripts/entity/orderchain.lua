@@ -1,5 +1,5 @@
 -- Fleet Jump through Gate Command Mod by MassCraxx
--- v4
+-- v5
 
 -- Wormhole handling
 
@@ -29,8 +29,8 @@ function OrderChain.addDiscoverWormholeOrder()
 
     if callingPlayer then
         local player = Player(callingPlayer)
-        if player:knowsSector(shipX, shipY) then
-            local sectorView = player:getKnownSector(shipX, shipY)
+        if player:knowsSector(shipX, shipY) or player.alliance:knowsSector(shipX, shipY) then
+            local sectorView = player:getKnownSector(shipX, shipY) or player.alliance:getKnownSector(shipX, shipY)
 
             local wormholeDestinations = {sectorView:getWormHoleDestinations()}
             for _, dest in pairs(wormholeDestinations) do
@@ -76,8 +76,9 @@ function OrderChain.addFlyThroughGateOrder(x, y)
 
     if callingPlayer then
         local player = Player(callingPlayer)
-        if player:knowsSector(shipX, shipY) then
-            local sectorView = player:getKnownSector(shipX, shipY)
+
+        if player:knowsSector(shipX, shipY) or player.alliance:knowsSector(shipX, shipY) then
+            local sectorView = player:getKnownSector(shipX, shipY) or player.alliance:getKnownSector(shipX, shipY)
 
             local gateDestinations = {sectorView:getGateDestinations()}
             for _, dest in pairs(gateDestinations) do

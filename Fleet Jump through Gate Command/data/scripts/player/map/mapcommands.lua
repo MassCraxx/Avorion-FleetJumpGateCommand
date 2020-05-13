@@ -1,5 +1,5 @@
 -- Fleet Jump through Gate Command Mod by MassCraxx
--- v4
+-- v5
 
 package.path = package.path .. ";data/scripts/?.lua"
 include("utility")
