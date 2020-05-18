@@ -1,5 +1,5 @@
 -- Fleet Jump through Gate Command Mod by MassCraxx
--- v5
+-- v6
 
 package.path = package.path .. ";data/scripts/?.lua"
 include("utility")
@@ -131,7 +131,7 @@ function MapCommands.onGatePressed()
     end
 
     local player = Player()
-    local sectorView = player:getKnownSector(x, y)
+    local sectorView = player:getKnownSector(x, y) or player.alliance:getKnownSector(x, y)
     if sectorView == nil then
         onError("Sector %i:%i has not been discovered yet."%_T, x, y)
     else

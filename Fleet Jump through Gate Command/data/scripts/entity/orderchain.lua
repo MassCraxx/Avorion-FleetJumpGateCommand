@@ -1,5 +1,5 @@
 -- Fleet Jump through Gate Command Mod by MassCraxx
--- v5
+-- v6
 
 -- Wormhole handling
 
