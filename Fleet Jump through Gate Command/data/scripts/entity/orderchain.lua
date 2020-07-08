@@ -1,8 +1,40 @@
 -- Fleet Jump through Gate Command Mod by MassCraxx
--- v6
+-- v7
 
--- Wormhole handling
+-- Undo fix for wormhole orders
+function OrderChain.undoOrder(x, y)
+    if onClient() then
+        invokeServerFunction("undoOrder", x, y)
+        return
+    end
 
+    if callingPlayer then
+        local owner, _, player = checkEntityInteractionPermissions(Entity(), AlliancePrivilege.ManageShips)
+        if not owner then return end
+    end
+
+    local chain = OrderChain.chain
+    local i = OrderChain.activeOrder
+
+    local active = #chain > 0 and not OrderChain.finished
+
+    if active and i < #chain then
+        OrderChain.chain[#OrderChain.chain] = nil
+        if OrderChain.executableOrders > #OrderChain.chain then
+            OrderChain.executableOrders = OrderChain.executableOrders - 1
+        end
+
+        OrderChain.updateChain()
+    elseif active and i == #chain and (chain[#chain].action == OrderType.Jump or chain[#chain].action == OrderType.FlyThroughWormhole) then
+        OrderChain.clearAllOrders()
+    else
+        OrderChain.sendError("Cannot undo last order."%_T)
+    end
+
+end
+callable(OrderChain, "undoOrder")
+
+-- Wormhole button handling
 function OrderChain.addDiscoverWormholeOrder()
     if onClient() then
         invokeServerFunction("addDiscoverWormholeOrder")
@@ -29,7 +61,7 @@ function OrderChain.addDiscoverWormholeOrder()
 
     if callingPlayer then
         local player = Player(callingPlayer)
-        if player:knowsSector(shipX, shipY) or player.alliance:knowsSector(shipX, shipY) then
+        if player:knowsSector(shipX, shipY) or (player.alliance and player.alliance:knowsSector(shipX, shipY)) then
             local sectorView = player:getKnownSector(shipX, shipY) or player.alliance:getKnownSector(shipX, shipY)
 
             local wormholeDestinations = {sectorView:getWormHoleDestinations()}
@@ -50,6 +82,7 @@ function OrderChain.addDiscoverWormholeOrder()
 end
 callable(OrderChain, "addDiscoverWormholeOrder")
 
+-- Gate button handling
 function OrderChain.addFlyThroughGateOrder(x, y)
     if onClient() then
         invokeServerFunction("addFlyThroughGateOrder")
@@ -77,7 +110,7 @@ function OrderChain.addFlyThroughGateOrder(x, y)
     if callingPlayer then
         local player = Player(callingPlayer)
 
-        if player:knowsSector(shipX, shipY) or player.alliance:knowsSector(shipX, shipY) then
+        if x and y and (player:knowsSector(shipX, shipY) or (player.alliance and player.alliance:knowsSector(shipX, shipY))) then
             local sectorView = player:getKnownSector(shipX, shipY) or player.alliance:getKnownSector(shipX, shipY)
 
             local gateDestinations = {sectorView:getGateDestinations()}
@@ -90,12 +123,17 @@ function OrderChain.addFlyThroughGateOrder(x, y)
                     return
                 end
             end
-        else
+        elseif x and y then
             OrderChain.sendError("Sector %i:%i has not been discovered yet."%_T, shipX, shipY)
             return
         end
-    end
 
-    OrderChain.sendError("Gate not found in Sector %i:%i!"%_T, shipX, shipY)
+        OrderChain.sendError("Gate not found in Sector %i:%i!"%_T, shipX, shipY)
+    end
 end
 callable(OrderChain, "addFlyThroughGateOrder")
+
+function OrderChain.sendError2(msg, ...)
+    OrderChain.sendError(msg, ...)
+end
+callable(OrderChain, "sendError2")
