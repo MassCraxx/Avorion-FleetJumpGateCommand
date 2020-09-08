@@ -78,7 +78,7 @@ function OrderChain.addDiscoverWormholeOrder()
         end
     end
 
-    OrderChain.sendError("No Wormhole found in Sector %i:%i!"%_T, shipX, shipY)
+    OrderChain.sendError("No wormhole found in sector %i:%i!"%_T, shipX, shipY)
 end
 callable(OrderChain, "addDiscoverWormholeOrder")
 
@@ -128,12 +128,10 @@ function OrderChain.addFlyThroughGateOrder(x, y)
             return
         end
 
-        OrderChain.sendError("Gate not found in Sector %i:%i!"%_T, shipX, shipY)
+        OrderChain.sendError("Specified gate not found in sector %i:%i!"%_T, shipX, shipY)
     end
 end
 callable(OrderChain, "addFlyThroughGateOrder")
 
-function OrderChain.sendError2(msg, ...)
-    OrderChain.sendError(msg, ...)
-end
-callable(OrderChain, "sendError2")
+-- show error messages from mapcommands
+callable(OrderChain, "sendError")

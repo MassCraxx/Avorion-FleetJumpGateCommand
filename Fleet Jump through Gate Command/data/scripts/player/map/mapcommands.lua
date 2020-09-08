@@ -1539,7 +1539,7 @@ if onClient() then
         end
     end
     
-    -- FJTGC Mod
+    -- FJTGC Mod --
     local gateWindow
     local gateCombo
     local gateData = {}
@@ -1585,10 +1585,6 @@ if onClient() then
 
     -- Init
     function MapCommands.initUI_FJTGC()
-        if orders == nil then
-            print("Orders not found!")
-            return
-        end
 
         -- gate button
         local gateOrder = {tooltip = "Use Gate"%_t, icon = "data/textures/icons/patrol.png", callback = "onGatePressed", type = OrderType.Gate}
@@ -1616,7 +1612,7 @@ if onClient() then
         local res = getResolution()
         local gateWindowSize = vec2(400, 50)
         gateWindow = GalaxyMap():createWindow(Rect(res * 0.5 - gateWindowSize * 0.5, res * 0.5 + gateWindowSize * 0.5))
-        gateWindow.caption = "Jump through Gate"%_t
+        gateWindow.caption = "Jump Through Gate"%_t
 
         local vsplit = UIVerticalSplitter(Rect(gateWindow.size), 10, 10, 0.6)
         gateCombo = gateWindow:createValueComboBox(vsplit.left, "")
@@ -1692,7 +1688,7 @@ if onClient() then
             local gateDestinations = {sectorView:getGateDestinations()}
 
             if #gateDestinations == 0 then
-                onModError(string.format("No Gate found in Sector %i:%i!"%_T, x, y))
+                onModError(string.format("No Gates found in sector %i:%i!"%_T, x, y))
             else
                 for i, dest in pairs(gateDestinations) do
                     local dir = getGateName(x, y, dest.x, dest.y)
@@ -1736,8 +1732,7 @@ if onClient() then
         local player = Player()
         local x, y = player:getShipPosition(name)
 
-        invokeEntityFunction(x, y, msg, player.craft.id, "data/scripts/entity/orderchain.lua", "sendError2", msg)
-        
+        invokeEntityFunction(x, y, msg, player.craft.id, "data/scripts/entity/orderchain.lua", "sendError", msg)
     end
 
 end -- onClient()
